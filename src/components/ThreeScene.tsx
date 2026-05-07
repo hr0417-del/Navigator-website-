@@ -138,9 +138,9 @@ const CoreShaderMaterial = shaderMaterial(
     
     // Glowing edge effect
     float alpha = mix(1.0 - uTransmission, 1.0, fresnel);
-    vec3 finalDisplay = mix(color * 0.3, color, fresnel * 2.0);
+    vec3 finalDisplay = mix(color * 0.3, color, fresnel * 1.2);
     
-    gl_FragColor = vec4(finalDisplay, alpha * 0.8);
+    gl_FragColor = vec4(finalDisplay, alpha * 0.6);
   }
   `
 );
@@ -174,7 +174,7 @@ const IntelligenceModule = ({
     useCursor(hovered);
   
     const scale = customScale || (isSecondary ? 0.5 : 0.85);
-    const intensityBase = isSecondary ? 0.6 : 1.5;
+    const intensityBase = isSecondary ? 0.4 : 1.0;
   
     useFrame((state) => {
       const t = state.clock.getElapsedTime();
@@ -221,17 +221,13 @@ const IntelligenceModule = ({
             onPointerOver={() => { setHovered(true); onHover(label, color); }}
             onPointerOut={() => { setHovered(false); onHover(null, null); }}
           >
-            <icosahedronGeometry args={[scale, 4]} />
-            <meshPhysicalMaterial
-              transmission={1}
-              thickness={2}
-              roughness={isSecondary ? 0.2 : 0.05}
-              clearcoat={1}
+            <icosahedronGeometry args={[scale, 3]} />
+            <meshStandardMaterial
               color={color}
               emissive={color}
               emissiveIntensity={intensityBase}
-              transparent
-              opacity={isSecondary ? 0.3 : 0.9}
+              roughness={0.3}
+              metalness={0.2}
             />
           </mesh>
 
@@ -280,7 +276,7 @@ const IntelligenceModule = ({
               anchorX="center"
               anchorY="middle"
               letterSpacing={0.25}
-              fillOpacity={hovered ? 1 : 0.6}
+              fillOpacity={hovered ? 1 : 0.8}
             >
               {hovered ? `${label.toUpperCase()}: ${Math.floor(70 + Math.random() * 20)}%` : label.toUpperCase()}
             </Text>
@@ -478,6 +474,79 @@ const ParticleCloud = () => {
   );
 };
 
+const CoreAnalysisStream = () => {
+    const [streams, setStreams] = useState<string[]>([]);
+    
+    useEffect(() => {
+        const chars = "0123456789ABCDEF";
+        const interval = setInterval(() => {
+            setStreams(prev => {
+                const newStream = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+                return [newStream, ...prev].slice(0, 8);
+            });
+        }, 50);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-50 overflow-hidden">
+            <div className="flex flex-col gap-px">
+                {streams.map((s, i) => (
+                    <motion.div 
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1 - i * 0.12, x: 0 }}
+                        key={`${s}-${i}`} 
+                        className="text-[4px] font-mono text-blue-400 bg-blue-500/5 px-1 rounded-sm"
+                    >
+                        {s}
+                    </motion.div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const InternalBrainActivity = () => {
+    const pointsRef = useRef<THREE.Points>(null!);
+    const count = 400;
+    
+    const particles = useMemo(() => {
+      const pos = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const r = Math.random() * 1.25;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i * 3 + 2] = r * Math.cos(phi);
+      }
+      return pos;
+    }, []);
+  
+    useFrame((state) => {
+      const t = state.clock.getElapsedTime();
+      if (pointsRef.current) {
+          pointsRef.current.rotation.y = t * 4; // Very fast rotation
+          pointsRef.current.rotation.x = t * 2.5;
+          pointsRef.current.scale.setScalar(0.9 + Math.sin(t * 10) * 0.1); // High frequency pulse
+      }
+    });
+  
+    return (
+      <Points ref={pointsRef} positions={particles}>
+        <PointMaterial 
+          transparent 
+          color="#A259FF" 
+          size={0.04} 
+          sizeAttenuation={true} 
+          depthWrite={false} 
+          blending={THREE.AdditiveBlending}
+          opacity={0.6}
+        />
+      </Points>
+    );
+};
+
 const HumanPotentialCore = ({ onClick, onHover }: { onClick: () => void, onHover: (label: string | null, color: string | null) => void }) => {
     const materialRef = useRef<any>(null!);
     const shellRef = useRef<THREE.Mesh>(null!);
@@ -510,6 +579,8 @@ const HumanPotentialCore = ({ onClick, onHover }: { onClick: () => void, onHover
                 {/* @ts-ignore */}
                 <coreShaderMaterial ref={materialRef} transparent />
             </mesh>
+
+            <InternalBrainActivity />
 
             {/* Core Wireframe Shell */}
             <mesh ref={shellRef}>
@@ -590,9 +661,10 @@ const HumanPotentialCore = ({ onClick, onHover }: { onClick: () => void, onHover
                             transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
                             className="absolute inset-0 border border-blue-400/10 rounded-full blur-xl"
                         />
-                        <div className="absolute inset-x-0 -bottom-2 text-[6px] text-blue-400/40 font-mono tracking-[0.5em] uppercase text-center animate-pulse">
+                        <div className="absolute inset-x-0 -bottom-2 text-[6px] text-blue-400/60 font-mono tracking-[0.5em] uppercase text-center animate-pulse font-bold">
                             SYNCING
                         </div>
+                        <CoreAnalysisStream />
                     </div>
                 </motion.div>
             </Html>
@@ -669,9 +741,9 @@ const Scene = ({
     <>
       <PerspectiveCamera makeDefault position={[0, 0, 18]} fov={50} />
       <ambientLight intensity={0.4} />
-      <pointLight position={[10, 10, 10]} intensity={1.5} color="#3B82F6" />
-      <spotLight position={[-10, 20, 10]} angle={0.15} penumbra={1} intensity={2} color="#ffffff" />
-      <fogExp2 attach="fog" args={['#050614', 0.015]} />
+      <pointLight position={[10, 10, 10]} intensity={1.0} color="#3B82F6" />
+      <spotLight position={[-10, 20, 10]} angle={0.15} penumbra={1} intensity={1.5} color="#ffffff" />
+      <fogExp2 attach="fog" args={['#050614', 0.005]} />
       <color attach="background" args={['#050614']} />
 
       <Suspense fallback={<mesh><boxGeometry /><meshBasicMaterial color="red" wireframe /></mesh>}>
@@ -743,6 +815,7 @@ const Scene = ({
             />
           </group>
         ))}
+        <Environment preset="night" />
       </Suspense>
 
 
@@ -782,10 +855,10 @@ const Scene = ({
         position={[0, 0, -20]} 
       />
 
-      {/* <EffectComposer>
-        <Bloom luminanceThreshold={0.2} intensity={1.2} radius={0.5} />
+      <EffectComposer>
+        <Bloom luminanceThreshold={0.2} intensity={0.5} radius={0.5} />
         <Vignette eskil={false} offset={0.1} darkness={0.8} />
-      </EffectComposer> */}
+      </EffectComposer>
 
       <OrbitControls 
         enablePan={false} 
